@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   User, Project, Task, Comment, ActivityLog, Screen, NavigationState, TaskStatus, TaskPriority, AppSettings
 } from '../types';
@@ -60,6 +60,15 @@ interface AppContextType {
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+// Re-calculate a project's progress (% of its tasks that are Done) from a task list.
+// Module-scoped (pure) so it has a stable identity and never invalidates memoized callbacks.
+const recalculateProgress = (projId: number, currentTasksList: Task[]) => {
+  const projectTasks = currentTasksList.filter(t => t.projectId === projId);
+  if (projectTasks.length === 0) return 0;
+  const completedTasks = projectTasks.filter(t => t.status === 'Done');
+  return Math.round((completedTasks.length / projectTasks.length) * 100);
+};
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isPreloading, setIsPreloading] = useState(false);
@@ -180,18 +189,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentUser]);
 
-  // Navigation helper
-  const navigateTo = (screen: Screen, projectId?: number, taskId?: number) => {
-    setIsPreloading(true);
+  // Navigation helper — synchronous; no artificial loading delay.
+  const navigateTo = useCallback((screen: Screen, projectId?: number, taskId?: number) => {
     setNavStack(prev => [...prev, navState]);
     setNavState({ screen, projectId, taskId });
-    setTimeout(() => {
-      setIsPreloading(false);
-    }, 450);
-  };
+  }, [navState]);
 
-  const navigateBack = () => {
-    setIsPreloading(true);
+  const navigateBack = useCallback(() => {
     if (navStack.length > 0) {
       const prev = navStack[navStack.length - 1];
       setNavStack(prevStack => prevStack.slice(0, prevStack.length - 1));
@@ -200,13 +204,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Fallback
       setNavState({ screen: currentUser ? 'DASHBOARD' : 'LOGIN' });
     }
-    setTimeout(() => {
-      setIsPreloading(false);
-    }, 450);
-  };
+  }, [navStack, currentUser]);
 
   // Auth Operations
-  const loginUser = (email: string) => {
+  const loginUser = useCallback((email: string) => {
     const cleanedEmail = email.trim().toLowerCase();
     const found = mockUsers.find(u => u.email.toLowerCase() === cleanedEmail) || mockUsers[4]; // Default to Marcus (PM) if not matched exactly
     setCurrentUser(found);
@@ -224,9 +225,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setActivityLogs(prev => [newLog, ...prev]);
     return true;
-  };
+  }, []);
 
-  const logoutUser = () => {
+  const logoutUser = useCallback(() => {
     if (currentUser) {
       const newLog: ActivityLog = {
         id: Date.now(),
@@ -241,10 +242,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.removeItem('tf_user');
     setNavStack([]);
     setNavState({ screen: 'LOGIN' });
-  };
+  }, [currentUser]);
 
   // Project Operations
-  const addProject = (name: string, description: string, category: string, dueDate: string) => {
+  const addProject = useCallback((name: string, description: string, category: string, dueDate: string) => {
     const newProject: Project = {
       id: Date.now(),
       name,
@@ -267,18 +268,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setActivityLogs(prev => [newLog, ...prev]);
     }
-  };
-
-  // Re-calculate progress bar recursively for a project when tasks mutate
-  const recalculateProgress = (projId: number, currentTasksList: Task[]) => {
-    const projectTasks = currentTasksList.filter(t => t.projectId === projId);
-    if (projectTasks.length === 0) return 0;
-    const completedTasks = projectTasks.filter(t => t.status === 'Done');
-    return Math.round((completedTasks.length / projectTasks.length) * 100);
-  };
+  }, [currentUser]);
 
   // Task Operations
-  const addTask = (taskData: Omit<Task, 'id' | 'createdAt'>) => {
+  const addTask = useCallback((taskData: Omit<Task, 'id' | 'createdAt'>) => {
     const newTaskId = Date.now();
     const newTask: Task = {
       ...taskData,
@@ -317,9 +310,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setActivityLogs(prev => [newLog, ...prev]);
     }
-  };
+  }, [currentUser]);
 
-  const updateTask = (taskId: number, updatedFields: Partial<Task>) => {
+  const updateTask = useCallback((taskId: number, updatedFields: Partial<Task>) => {
     let oldTask: Task | undefined;
     
     setTasks(prev => {
@@ -373,9 +366,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setActivityLogs(prev => [newLog, ...prev]);
     }
-  };
+  }, [currentUser]);
 
-  const deleteTask = (taskId: number) => {
+  const deleteTask = useCallback((taskId: number) => {
     let taskToDelete: Task | undefined;
     setTasks(prev => {
       taskToDelete = prev.find(t => t.id === taskId);
@@ -412,10 +405,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       setActivityLogs(prev => [newLog, ...prev]);
     }
-  };
+  }, [currentUser]);
 
   // Add Comment
-  const addComment = (taskId: number, message: string) => {
+  const addComment = useCallback((taskId: number, message: string) => {
     if (!currentUser) return;
 
     const newComment: Comment = {
@@ -440,57 +433,62 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdAt: new Date().toISOString()
     };
     setActivityLogs(prev => [newLog, ...prev]);
-  };
+  }, [currentUser, tasks]);
 
   // Update Settings Preferences
-  const updateSettings = (newSettingsValues: Partial<AppSettings>) => {
+  const updateSettings = useCallback((newSettingsValues: Partial<AppSettings>) => {
     setSettings(prev => ({
       ...prev,
       ...newSettingsValues
     }));
-  };
+  }, []);
 
   // Filters Reset
-  const resetFilters = () => {
+  const resetFilters = useCallback(() => {
     setFilters({
       status: 'All',
       priority: 'All',
       assigneeId: 'All'
     });
     setSearchQuery('');
-  };
+  }, []);
 
-  return (
-    <AppContext.Provider value={{
-      currentUser,
-      users: mockUsers,
-      projects,
-      tasks,
-      comments,
-      activityLogs,
-      navState,
-      navStack,
-      settings,
-      isPreloading,
-      navigateTo,
-      navigateBack,
-      loginUser,
-      logoutUser,
-      addProject,
-      addTask,
-      updateTask,
-      deleteTask,
-      addComment,
-      updateSettings,
-      searchQuery,
-      setSearchQuery,
-      filters,
-      setFilters,
-      resetFilters
-    }}>
-      {children}
-    </AppContext.Provider>
-  );
+  // Memoize the context value so consumers only re-render when real state changes,
+  // not on every AppProvider render. Callbacks are stable via useCallback above.
+  const value = useMemo<AppContextType>(() => ({
+    currentUser,
+    users: mockUsers,
+    projects,
+    tasks,
+    comments,
+    activityLogs,
+    navState,
+    navStack,
+    settings,
+    isPreloading,
+    navigateTo,
+    navigateBack,
+    loginUser,
+    logoutUser,
+    addProject,
+    addTask,
+    updateTask,
+    deleteTask,
+    addComment,
+    updateSettings,
+    searchQuery,
+    setSearchQuery,
+    filters,
+    setFilters,
+    resetFilters
+  }), [
+    currentUser, projects, tasks, comments, activityLogs, navState, navStack,
+    settings, isPreloading, navigateTo, navigateBack, loginUser, logoutUser,
+    addProject, addTask, updateTask, deleteTask, addComment, updateSettings,
+    searchQuery, filters, resetFilters
+  ]);
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 };
 
 export const useApp = () => {

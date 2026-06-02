@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Project, User } from '../types';
 import { 
@@ -40,16 +40,37 @@ export const Projects: React.FC = () => {
   const [projDueDate, setProjDueDate] = useState('');
   const [error, setError] = useState('');
 
-  // Extract unique categories for filter
-  const categories = ['All', ...Array.from(new Set(projects.map(p => p.category).filter(Boolean)))];
+  // Extract unique categories for filter (memoized).
+  const categories = useMemo(
+    () => ['All', ...Array.from(new Set(projects.map(p => p.category).filter(Boolean)))],
+    [projects]
+  );
 
-  // Filters
-  const filteredProjects = projects.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) || 
-                          p.description.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  // Filtered project list (memoized).
+  const filteredProjects = useMemo(() => {
+    const q = search.toLowerCase();
+    return projects.filter(p => {
+      const matchesSearch = p.name.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
+      const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [projects, search, selectedCategory]);
+
+  // Precompute the assigned team per project once, instead of per card.
+  const teamByProject = useMemo(() => {
+    const idsByProject = new Map<number, Set<number>>();
+    for (const t of tasks) {
+      if (t.assigneeId === null) continue;
+      const set = idsByProject.get(t.projectId) ?? new Set<number>();
+      set.add(t.assigneeId);
+      idsByProject.set(t.projectId, set);
+    }
+    const result = new Map<number, User[]>();
+    for (const [projId, ids] of idsByProject) {
+      result.set(projId, users.filter(u => ids.has(u.id)));
+    }
+    return result;
+  }, [tasks, users]);
 
   // Handle Project Creation Sumission
   const handleCreateProject = (e: React.FormEvent) => {
@@ -71,12 +92,8 @@ export const Projects: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // Extract team members who are assigned tasks on a specific project
-  const getProjectTeam = (projId: number): User[] => {
-    const projectTasks = tasks.filter(t => t.projectId === projId);
-    const assignedIds = Array.from(new Set(projectTasks.map(t => t.assigneeId).filter((id): id is number => id !== null)));
-    return users.filter(u => assignedIds.includes(u.id));
-  };
+  // Extract team members who are assigned tasks on a specific project (from precomputed map).
+  const getProjectTeam = (projId: number): User[] => teamByProject.get(projId) ?? [];
 
   return (
     <div className="space-y-6 font-sans">

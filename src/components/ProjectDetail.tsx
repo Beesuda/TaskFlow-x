@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { KanbanBoard } from './KanbanBoard';
 import { ListView } from './ListView';
@@ -48,6 +48,37 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ onNewTaskClick, on
   const projectId = navState.projectId;
   const project = projects.find(p => p.id === projectId);
 
+  // Tasks belonging exclusively to this project (memoized).
+  const projectAllTasks = useMemo(
+    () => tasks.filter(t => t.projectId === project?.id),
+    [tasks, project?.id]
+  );
+
+  // Status counters for secondary header analytics (single pass).
+  const tabCounts = useMemo(() => {
+    const counts = { all: projectAllTasks.length, backlog: 0, todo: 0, progress: 0, review: 0, done: 0 };
+    for (const t of projectAllTasks) {
+      if (t.status === 'Backlog') counts.backlog++;
+      else if (t.status === 'To Do') counts.todo++;
+      else if (t.status === 'In Progress') counts.progress++;
+      else if (t.status === 'Review') counts.review++;
+      else if (t.status === 'Done') counts.done++;
+    }
+    return counts;
+  }, [projectAllTasks]);
+
+  // Filter pipeline (search + status/priority/assignee), memoized.
+  const filteredTasks = useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return projectAllTasks.filter(task => {
+      const matchesSearch = task.title.toLowerCase().includes(q) || task.description.toLowerCase().includes(q);
+      const matchesStatus = filters.status === 'All' || task.status === filters.status;
+      const matchesPriority = filters.priority === 'All' || task.priority === filters.priority;
+      const matchesAssignee = filters.assigneeId === 'All' || task.assigneeId === parseInt(filters.assigneeId, 10);
+      return matchesSearch && matchesStatus && matchesPriority && matchesAssignee;
+    });
+  }, [projectAllTasks, searchQuery, filters]);
+
   if (!project) {
     return (
       <div className="text-center py-12 p-4 font-sans theme-card border rounded-2xl">
@@ -63,33 +94,8 @@ export const ProjectDetail: React.FC<ProjectDetailProps> = ({ onNewTaskClick, on
     );
   }
 
-  // Filter tasks belonging exclusively to this project
-  const projectAllTasks = tasks.filter(t => t.projectId === project.id);
-
-  // Dynamic status counters for secondary header analytics
-  const tabCounts = {
-    all: projectAllTasks.length,
-    backlog: projectAllTasks.filter(t => t.status === 'Backlog').length,
-    todo: projectAllTasks.filter(t => t.status === 'To Do').length,
-    progress: projectAllTasks.filter(t => t.status === 'In Progress').length,
-    review: projectAllTasks.filter(t => t.status === 'Review').length,
-    done: projectAllTasks.filter(t => t.status === 'Done').length,
-  };
-
   // Safe user listing who belong in this project to show inside filters
   const projectAssignees = users;
-
-  // Filter pipeline application
-  const filteredTasks = projectAllTasks.filter(task => {
-    const matchesSearch = task.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                          task.description.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesStatus = filters.status === 'All' || task.status === filters.status;
-    const matchesPriority = filters.priority === 'All' || task.priority === filters.priority;
-    const matchesAssignee = filters.assigneeId === 'All' || task.assigneeId === parseInt(filters.assigneeId, 10);
-
-    return matchesSearch && matchesStatus && matchesPriority && matchesAssignee;
-  });
 
   const handleStatusFilterClick = (statusValue: string) => {
     setFilters(prev => ({ ...prev, status: statusValue }));

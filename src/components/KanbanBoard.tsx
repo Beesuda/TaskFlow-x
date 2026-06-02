@@ -3,9 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Task, TaskStatus } from '../types';
+
+const COLUMNS: TaskStatus[] = ['Backlog', 'To Do', 'In Progress', 'Review', 'Done'];
 import { 
   Calendar, 
   MessageSquare, 
@@ -35,7 +37,18 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const { users, updateTask, deleteTask, comments } = useApp();
   const [draggedOverColumn, setDraggedOverColumn] = useState<string | null>(null);
 
-  const columns: TaskStatus[] = ['Backlog', 'To Do', 'In Progress', 'Review', 'Done'];
+  const columns = COLUMNS;
+
+  // Group tasks by status once per task-list change, instead of filtering per column.
+  const tasksByStatus = useMemo(() => {
+    const groups: Record<TaskStatus, Task[]> = {
+      'Backlog': [], 'To Do': [], 'In Progress': [], 'Review': [], 'Done': [],
+    };
+    for (const t of tasks) {
+      (groups[t.status] ??= []).push(t);
+    }
+    return groups;
+  }, [tasks]);
 
   // Native Drag and Drop
   const handleDragStart = (e: React.DragEvent, taskId: number) => {
@@ -106,7 +119,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       id="kanban-swimlanes"
     >
       {columns.map(col => {
-        const columnTasks = tasks.filter(t => t.status === col);
+        const columnTasks = tasksByStatus[col];
         const isDraggingOver = draggedOverColumn === col;
 
         return (

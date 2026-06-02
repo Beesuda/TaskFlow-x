@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Task, TaskStatus, TaskPriority } from '../types';
 import { 
@@ -67,20 +67,22 @@ export const ListView: React.FC<ListViewProps> = ({ tasks, onTaskClick }) => {
     }
   };
 
-  // Apply sorting
-  const sortedTasks = [...tasks].sort((a, b) => {
-    let result = 0;
-    if (sortField === 'title') {
-      result = a.title.localeCompare(b.title);
-    } else if (sortField === 'dueDate') {
-      result = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
-    } else if (sortField === 'priority') {
-      result = getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
-    } else if (sortField === 'status') {
-      result = getStatusWeight(a.status) - getStatusWeight(b.status);
-    }
-    return sortOrder === 'asc' ? result : -result;
-  });
+  // Apply sorting (memoized — re-sorts only when tasks or sort settings change).
+  const sortedTasks = useMemo(() => {
+    return [...tasks].sort((a, b) => {
+      let result = 0;
+      if (sortField === 'title') {
+        result = a.title.localeCompare(b.title);
+      } else if (sortField === 'dueDate') {
+        result = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      } else if (sortField === 'priority') {
+        result = getPriorityWeight(a.priority) - getPriorityWeight(b.priority);
+      } else if (sortField === 'status') {
+        result = getStatusWeight(a.status) - getStatusWeight(b.status);
+      }
+      return sortOrder === 'asc' ? result : -result;
+    });
+  }, [tasks, sortField, sortOrder]);
 
   const getPriorityBadgeStyle = (p: TaskPriority) => {
     switch (p) {

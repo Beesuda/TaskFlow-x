@@ -11,58 +11,65 @@ export type TaskPriority = z.infer<typeof taskPrioritySchema>;
 // nullable assignee accepts a number or null (Unassigned).
 const assigneeId = z.number().int().nullable();
 
+// Shared bounded string helpers — upper bounds reject abusive/oversized input
+// while staying well above any legitimate UI value.
+const shortText = (min = 1) => z.string().trim().min(min).max(120);
+const longText = z.string().max(5000);
+const email = z.string().trim().email().max(254);
+const dateStr = z.string().trim().min(1).max(40);
+
 export const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email,
+  password: z.string().min(1).max(200),
 });
 
 export const registerSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(6),
-  role: z.string().min(1).optional(),
+  name: shortText(),
+  email,
+  password: z.string().min(8).max(200),
+  role: shortText().optional(),
 });
 
 export const createProjectSchema = z.object({
-  name: z.string().min(1),
-  description: z.string().default(''),
-  category: z.string().optional(),
-  dueDate: z.string().min(1),
+  name: shortText(),
+  description: longText.default(''),
+  category: shortText().optional(),
+  dueDate: dateStr,
 });
 
 export const updateProjectSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  category: z.string().nullable().optional(),
-  dueDate: z.string().min(1).optional(),
+  name: shortText().optional(),
+  description: longText.optional(),
+  category: shortText().nullable().optional(),
+  dueDate: dateStr.optional(),
 });
 
 export const createTaskSchema = z.object({
   projectId: z.number().int(),
-  title: z.string().min(1),
-  description: z.string().default(''),
+  title: shortText(),
+  description: longText.default(''),
   status: taskStatusSchema.default('To Do'),
   priority: taskPrioritySchema,
   assigneeId: assigneeId.default(null),
-  dueDate: z.string().min(1),
+  dueDate: dateStr,
 });
 
 export const updateTaskSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
+  title: shortText().optional(),
+  description: longText.optional(),
   status: taskStatusSchema.optional(),
   priority: taskPrioritySchema.optional(),
   assigneeId: assigneeId.optional(),
-  dueDate: z.string().min(1).optional(),
+  dueDate: dateStr.optional(),
 });
 
 export const createCommentSchema = z.object({
-  message: z.string().min(1),
+  message: z.string().trim().min(1).max(2000),
 });
 
 export const updateSettingsSchema = z.object({
-  profileName: z.string().min(1).optional(),
-  profileEmail: z.string().email().optional(),
+  profileName: shortText().optional(),
+  profileEmail: email.optional(),
   theme: themeSchema.optional(),
   notifications: z
     .object({

@@ -1,0 +1,41 @@
+# TaskFlow — full stack on Docker Desktop.
+# Host ports chosen to avoid conflicts with the local dev servers (3000/4000)
+# and other occupied ports: frontend on 8090, backend API on 4100.
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: taskflow-web
+    container_name: taskflow-web
+    ports:
+      - "8090:80"
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: taskflow-api
+    container_name: taskflow-api
+    ports:
+      - "4100:4000"
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      DATABASE_URL: "file:/data/dev.db"
+      # CHANGE THIS in any real deployment (>= 32 chars enforced in production).
+      JWT_SECRET: "KQkfWN+u7P67qwyHF8IM5IKYuZCsJIpxZcw3uJhrQ1W_docker"
+      JWT_EXPIRES_IN: "7d"
+      # Browser origin allowed by CORS — the web container's published port.
+      CLIENT_ORIGIN: "http://localhost:8090"
+      SEED_PASSWORD: "password123"
+    volumes:
+      - taskflow-db:/data
+    restart: unless-stopped
+
+volumes:
+  taskflow-db:

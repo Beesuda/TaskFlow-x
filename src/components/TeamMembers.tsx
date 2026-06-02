@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Search, Mail, Briefcase, CheckCircle2, ListFilter } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -12,25 +12,33 @@ export const TeamMembers: React.FC = () => {
   const { users, tasks, projects, navigateTo, setFilters } = useApp();
   const [search, setSearch] = useState('');
 
-  // Filter members based on keyword
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(search.toLowerCase()) ||
-    u.role.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter members based on keyword (memoized).
+  const filteredUsers = useMemo(() => {
+    const q = search.toLowerCase();
+    return users.filter(u =>
+      u.name.toLowerCase().includes(q) ||
+      u.role.toLowerCase().includes(q) ||
+      u.email.toLowerCase().includes(q)
+    );
+  }, [users, search]);
 
-  // Dynamically compute tasks count across projects for a user
-  const getUserTasksCount = (userId: number) => {
-    return tasks.filter(t => t.assigneeId === userId).length;
-  };
+  // Per-user task counts (total / done / active) computed in a single pass.
+  const countsByUser = useMemo(() => {
+    const map = new Map<number, { total: number; done: number; active: number }>();
+    for (const t of tasks) {
+      if (t.assigneeId === null) continue;
+      const entry = map.get(t.assigneeId) ?? { total: 0, done: 0, active: 0 };
+      entry.total++;
+      if (t.status === 'Done') entry.done++;
+      else entry.active++;
+      map.set(t.assigneeId, entry);
+    }
+    return map;
+  }, [tasks]);
 
-  const getUserCompletedTasksCount = (userId: number) => {
-    return tasks.filter(t => t.assigneeId === userId && t.status === 'Done').length;
-  };
-
-  const getUserActiveTasksCount = (userId: number) => {
-    return tasks.filter(t => t.assigneeId === userId && t.status !== 'Done').length;
-  };
+  const getUserTasksCount = (userId: number) => countsByUser.get(userId)?.total ?? 0;
+  const getUserCompletedTasksCount = (userId: number) => countsByUser.get(userId)?.done ?? 0;
+  const getUserActiveTasksCount = (userId: number) => countsByUser.get(userId)?.active ?? 0;
 
   const handleMemberTasksRedirect = (userId: number) => {
     // Navigate to projects screen and apply filter automatically

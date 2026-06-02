@@ -33,15 +33,11 @@ export const Login: React.FC = () => {
     }
 
     setIsSubmitting(true);
-
-    // Simulate rapid auth feedback delay
-    setTimeout(() => {
-      const success = loginUser(email);
-      setIsSubmitting(false);
-      if (!success) {
-        setError('Unable to load data or sign in. Try again.');
-      }
-    }, 600);
+    const success = loginUser(email);
+    setIsSubmitting(false);
+    if (!success) {
+      setError('Unable to load data or sign in. Try again.');
+    }
   };
 
   const autofillUser = (selectedEmail: string) => {

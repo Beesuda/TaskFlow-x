@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { Navigation } from './components/Navigation';
 import { Login } from './components/Login';
@@ -60,6 +60,15 @@ const AppContent: React.FC = () => {
     handleOpenTaskForm(activeProjId, 'To Do');
   };
 
+  // Auto-open the task detail modal when navigating directly to a task (deep link).
+  // Runs as an effect (not during render) so it fires once per navState change.
+  useEffect(() => {
+    if (navState.screen === 'PROJECT_DETAIL' && navState.taskId && !isTaskDetailOpen && selectedTaskId !== navState.taskId) {
+      setSelectedTaskId(navState.taskId);
+      setIsTaskDetailOpen(true);
+    }
+  }, [navState.screen, navState.taskId, isTaskDetailOpen, selectedTaskId]);
+
   // Renders correct main body screen
   const renderScreen = () => {
     switch (navState.screen) {
@@ -88,15 +97,6 @@ const AppContent: React.FC = () => {
     return <Login />;
   }
 
-  // Intercept the routing stack parameters to auto-launch detail modal on direct navigation
-  if (navState.screen === 'PROJECT_DETAIL' && navState.taskId && !isTaskDetailOpen && selectedTaskId !== navState.taskId) {
-    // Timeout to bypass double state renders
-    setTimeout(() => {
-      setSelectedTaskId(navState.taskId!);
-      setIsTaskDetailOpen(true);
-    }, 50);
-  }
-
   return (
     <div className="min-h-screen text-slate-800 dark:text-slate-100 theme-bg font-sans select-none antialiased">
       {/* Preloading Status indicator overlay and top progress bar */}
@@ -109,13 +109,13 @@ const AppContent: React.FC = () => {
       <main className="md:pl-64 min-h-screen pb-20 sm:pb-6 pt-18 md:pt-6 px-4 sm:px-6 w-full max-w-7xl mx-auto flex flex-col justify-between">
         
         {/* Animated slide transitions for views */}
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           <motion.div
             key={navState.screen + (navState.projectId ? `-${navState.projectId}` : '')}
-            initial={{ opacity: 0, x: 10 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -10 }}
-            transition={{ duration: 0.18, ease: 'easeInOut' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12, ease: 'easeOut' }}
             className="flex-1"
           >
             {renderScreen()}

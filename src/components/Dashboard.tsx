@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import { useApp } from '../context/AppContext';
 import { Task, Project, ActivityLog } from '../types';
 import { 
@@ -30,55 +30,52 @@ export const Dashboard: React.FC = () => {
     users 
   } = useApp();
 
-  const [isLoading, setIsLoading] = useState(true);
+  // Aggregate statistics (memoized — recomputed only when projects/tasks change).
+  const {
+    totalProjects,
+    totalTasks,
+    inProgressTasks,
+    doneTasksCount,
+    totalProgress,
+    taskStatsByProject,
+  } = useMemo(() => {
+    const statsByProject = new Map<number, { count: number; done: number }>();
+    let inProgress = 0;
+    let done = 0;
+    for (const t of tasks) {
+      if (t.status === 'In Progress') inProgress++;
+      if (t.status === 'Done') done++;
+      const entry = statsByProject.get(t.projectId) ?? { count: 0, done: 0 };
+      entry.count++;
+      if (t.status === 'Done') entry.done++;
+      statsByProject.set(t.projectId, entry);
+    }
+    return {
+      totalProjects: projects.length,
+      totalTasks: tasks.length,
+      inProgressTasks: inProgress,
+      doneTasksCount: done,
+      totalProgress: projects.length > 0
+        ? Math.round(projects.reduce((sum, p) => sum + p.progress, 0) / projects.length)
+        : 0,
+      taskStatsByProject: statsByProject,
+    };
+  }, [projects, tasks]);
 
-  // Simulate loading states for high fidelity
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 450);
-    return () => clearTimeout(timer);
-  }, []);
+  // Tasks assigned to the current user.
+  const myAssignedTasks = useMemo(
+    () => tasks.filter(t => t.assigneeId === currentUser?.id),
+    [tasks, currentUser?.id]
+  );
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6 animate-pulse p-4">
-        <div className="h-10 bg-slate-200 dark:bg-slate-800 rounded-lg w-1/4 mb-4" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(idx => (
-            <div key={idx} className="h-24 bg-slate-200 dark:bg-slate-800 rounded-xl" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded-xl" />
-            <div className="h-48 bg-slate-200 dark:bg-slate-800 rounded-xl" />
-          </div>
-          <div className="h-96 bg-slate-200 dark:bg-slate-800 rounded-xl" />
-        </div>
-      </div>
-    );
-  }
-
-  // Calculate statistics
-  const totalProjects = projects.length;
-  const totalTasks = tasks.length;
-  const inProgressTasks = tasks.filter(t => t.status === 'In Progress').length;
-  const doneTasksCount = tasks.filter(t => t.status === 'Done').length;
-  
-  // Calculate general progress percentage average
-  const totalProgress = totalProjects > 0 
-    ? Math.round(projects.reduce((sum, p) => sum + p.progress, 0) / totalProjects)
-    : 0;
-
-  // Filter tasks due soon or today (June 2026 current frame as per local metadata)
-  const myAssignedTasks = tasks.filter(t => t.assigneeId === currentUser?.id);
-  
-  // Hardcoded due today and deadlines
-  const sortedDeadlines = [...tasks]
-    .filter(t => t.status !== 'Done')
-    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-    .slice(0, 4);
+  // Nearest upcoming deadlines among open tasks.
+  const sortedDeadlines = useMemo(
+    () => [...tasks]
+      .filter(t => t.status !== 'Done')
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+      .slice(0, 4),
+    [tasks]
+  );
 
   // Helper to map assignee usernames/avatars safely
   const getUserAvatar = (id: number | null) => {
@@ -225,8 +222,9 @@ export const Dashboard: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {projects.map(project => {
-                const projectTasksCount = tasks.filter(t => t.projectId === project.id).length;
-                const completedTasks = tasks.filter(t => t.projectId === project.id && t.status === 'Done').length;
+                const projectStats = taskStatsByProject.get(project.id) ?? { count: 0, done: 0 };
+                const projectTasksCount = projectStats.count;
+                const completedTasks = projectStats.done;
                 return (
                   <div
                     key={project.id}
