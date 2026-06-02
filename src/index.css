@@ -1,0 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --bg-app: #F8FAFC;
+  --bg-sidebar: #0F172A;
+  --text-sidebar: #F8FAFC;
+  --bg-sidebar-hover: #1E293B;
+  --bg-sidebar-active: #2563EB;
+  --bg-card: #FFFFFF;
+  --border-card: #E2E8F0;
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --border-divider: #E2E8F0;
+  --bg-hover: #F1F5F9;
+  --bg-input: #FFFFFF;
+}
+
+.dark-theme {
+  --bg-app: #0B0F19;
+  --bg-sidebar: #131A2D;
+  --text-sidebar: #F8FAFC;
+  --bg-sidebar-hover: #1E293B;
+  --bg-sidebar-active: #2563EB;
+  --bg-card: #162035;
+  --border-card: #202D4A;
+  --text-primary: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #94A3B8;
+  --border-divider: #243556;
+  --bg-hover: #1C2945;
+  --bg-input: #0F1626;
+}
+
+.cosmic-theme {
+  --bg-app: #070913;
+  --bg-sidebar: #121323;
+  --text-sidebar: #F1F5F9;
+  --bg-sidebar-hover: #222440;
+  --bg-sidebar-active: #4F46E5;
+  --bg-card: #181932;
+  --border-card: #282B54;
+  --text-primary: #EEF2F6;
+  --text-secondary: #A5B4FC;
+  --text-muted: #818CF8;
+  --border-divider: #2C3063;
+  --bg-hover: #21244A;
+  --bg-input: #111226;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--bg-app);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+  overflow-x: hidden;
+}
+
+/* Custom Bold Typography utility classes */
+.bold-title {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+/* Priority Indicator Borders for Task Cards */
+.task-card-theme {
+  border-left-width: 4px;
+}
+.task-card-high {
+  border-left-color: #EF4444;
+}
+.task-card-medium {
+  border-left-color: #F59E0B;
+}
+.task-card-low {
+  border-left-color: #22C55E;
+}
+
+/* Transition utility classes using native CSS variables */
+.theme-bg {
+  background-color: var(--bg-app);
+  transition: background-color 0.2s ease;
+}
+
+.theme-card {
+  background-color: var(--bg-card);
+  border-width: 1px;
+  border-color: var(--border-card);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.theme-text {
+  color: var(--text-primary);
+  transition: color 0.15s ease;
+}
+
+.theme-text-secondary {
+  color: var(--text-secondary);
+  transition: color 0.15s ease;
+}
+
+.theme-text-muted {
+  color: var(--text-muted);
+  transition: color 0.15s ease;
+}
+
+.theme-border {
+  border-color: var(--border-card);
+  transition: border-color 0.2s ease;
+}
+
+.theme-divider {
+  border-color: var(--border-divider);
+  transition: border-color 0.2s ease;
+}
+
+.theme-input {
+  background-color: var(--bg-input);
+  border-width: 1px;
+  border-color: var(--border-card);
+  color: var(--text-primary);
+  transition: all 0.15s ease;
+}
+
+.theme-input:focus {
+  border-color: #2563EB;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.dark-theme .theme-input:focus,
+.cosmic-theme .theme-input:focus {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-card);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* Custom visual pulse for active drag, activity timeline nodes */
+@keyframes border-pulse {
+  0%, 100% { border-color: var(--border-card); }
+  50% { border-color: #2563EB; }
+}
+
+.card-pulsing {
+  animation: border-pulse 2s infinite ease-in-out;
+}
