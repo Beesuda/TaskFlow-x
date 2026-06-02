@@ -1,0 +1,90 @@
+// TaskFlow backend data model.
+// String literals for status/priority/theme intentionally mirror the frontend
+// TS unions in src/types.ts exactly (e.g. "To Do", "In Progress"). Do not rename.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String // bcrypt hash
+  avatar    String // 2-letter initials, e.g. "SJ"
+  role      String
+  createdAt DateTime @default(now())
+
+  settings     Settings?
+  tasks        Task[]        @relation("assignee")
+  comments     Comment[]
+  activityLogs ActivityLog[]
+}
+
+model Project {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String
+  dueDate     String // ISO date string, e.g. "2026-07-15"
+  category    String?
+  createdAt   DateTime @default(now())
+
+  tasks        Task[]
+  activityLogs ActivityLog[]
+  // progress (% of tasks Done) is computed on read, never stored.
+}
+
+model Task {
+  id          Int      @id @default(autoincrement())
+  projectId   Int
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title       String
+  description String
+  status      String // Backlog | To Do | In Progress | Review | Done
+  priority    String // Low | Medium | High
+  assigneeId  Int?
+  assignee    User?    @relation("assignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  dueDate     String
+  createdAt   DateTime @default(now())
+
+  comments     Comment[]
+  activityLogs ActivityLog[]
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  message   String
+  createdAt DateTime @default(now())
+}
+
+model ActivityLog {
+  id        Int      @id @default(autoincrement())
+  taskId    Int?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  projectId Int?
+  project   Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  action    String // login | logout | created | changed_status | updated | assigned | commented | deleted
+  details   String
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id           Int     @id @default(autoincrement())
+  userId       Int     @unique
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme        String  @default("Light") // Light | Dark | Cosmic
+  notifEmail   Boolean @default(true)
+  notifBrowser Boolean @default(true)
+  notifWeekly  Boolean @default(false)
+}
